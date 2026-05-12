@@ -486,7 +486,7 @@ textarea.txt-area:focus{border-color:#185FA5}
 
 <script>
 // ========== GAS エンドポイント ==========
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwhVmwOJWq5TjBMim1QFZPeX-gZYvDleGrM9FfX2KZ1JzVyx2P3Iuf7J99POrO_rr4/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxf56JDL6A4jpQxyM3SrRE9QmIIbR6oEfc-llg4TZWqhSpdKQh9D6oN_4YrpxG8EKB1/exec';
 
 // ========== GAS呼び出しヘルパー ==========
 async function callGAS(action, data = {}) {
@@ -501,9 +501,13 @@ async function callGAS(action, data = {}) {
   return json;
 }
 
-// ========== マスタデータ ==========
-let MASTER = [];
-let STAFF  = [];
+// ========== マスタデータ（hardcoded） ==========
+const MASTER = [
+  {id:'P001',name:'HI五反田ビル',addr:'東京都品川区西五反田2-11-17',works:['ガラス清掃'],areas:{'ガラス清掃':['外面ガラス(ロープ)','内面ガラス','エントランス']},comments:{'ガラス清掃':'シャンプースクイジー'}},
+  {id:'P002',name:'サンハイム田町',addr:'東京都港区芝5-13-5',works:['定期清掃'],areas:{'定期清掃':['共用廊下','1Fエントランス','共用階段']},comments:{'定期清掃':'洗剤散布\nポリッシャー洗浄\n汚水回収\n水拭き'}},
+  {id:'P003',name:'東京プリンスホテル',addr:'東京都港区芝公園3-3-1',works:['絨毯クリーニング'],areas:{'絨毯クリーニング':['客室ベッド下','客室ベッド下隅除塵','廊下','EVホール','廊下隅除塵後フィルター']},comments:{'絨毯クリーニング':'アップライト吸塵\n隅除塵\n洗剤散布\nポリッシャー洗浄'}}
+];
+const STAFF  = ['兼古　泰士','山田　花子','鈴木　次郎','田中　一郎','佐藤　美咲'];
 const PHASES   = ['作業前','作業中','作業後'];
 const PC       = ['b','d','a'];
 const SAVE_KEY = 'cleaning_report_save';
@@ -565,49 +569,31 @@ function clearSave() { localStorage.removeItem(SAVE_KEY); }
 
 // ========== 初期化 ==========
 function init() {
-  // ローディング表示
-  document.getElementById('prop-count').textContent = '（読込中...）';
+  st.propId = MASTER[0].id;
+  st.person = STAFF[0];
 
-  fetch(GAS_URL + '?action=getMasterData', {
-    redirect: 'follow'
-  })
-    .then(r => r.json())
-    .then(function(data) {
-      MASTER = data.properties;
-      STAFF  = data.staff;
+  document.getElementById('prop-count').textContent = `（${MASTER.length}件）`;
+  buildDD();
+  buildStaffPicker();
+  updatePropDisplay();
+  updateWorkPills();
+  updateStaffDisplay();
 
-      // 初期状態をセット
-      if (MASTER.length > 0) st.propId = MASTER[0].id;
-      if (STAFF.length  > 0) st.person = STAFF[0];
-
-      document.getElementById('prop-count').textContent = `（${MASTER.length}件）`;
-      buildDD();
-      buildStaffPicker();
-      updatePropDisplay();
-      updateWorkPills();
-      updateStaffDisplay();
-
-      // 保存データ確認
-      const saved = loadLocal();
-      const banner = document.getElementById('resume-banner');
-      if (saved && saved.photos && Object.keys(saved.photos).length > 0) {
-        const p = MASTER.find(m => m.id === saved.propId);
-        const pName = p ? p.name : '不明';
-        const wName = p ? p.works[saved.workIdx] : '';
-        const pCount = Object.keys(saved.photos).length;
-        const d = new Date(saved.savedAt);
-        document.getElementById('resume-desc').textContent =
-          `${pName} / ${wName}（${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}）写真${pCount}枚`;
-        banner.style.display = 'flex';
-      } else {
-        banner.style.display = 'none';
-      }
-    })
-    .catch(function(err) {
-      document.getElementById('prop-count').textContent = '（読込エラー）';
-      console.error('getMasterData error:', err);
-      alert('マスタデータの読み込みに失敗しました。\n画面を更新してください。');
-    });
+  const saved = loadLocal();
+  const banner = document.getElementById('resume-banner');
+  if (saved && saved.photos && Object.keys(saved.photos).length > 0) {
+    const p = MASTER.find(m => m.id === saved.propId);
+    const pName = p ? p.name : '不明';
+    const wName = p ? p.works[saved.workIdx] : '';
+    const pCount = Object.keys(saved.photos).length;
+    const d = new Date(saved.savedAt);
+    document.getElementById('resume-desc').textContent =
+      `${pName} / ${wName}（${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}）写真${pCount}枚`;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
 }
 
 function resumeFromSave() {
@@ -1091,6 +1077,7 @@ function resetApp() {
   clearInterval(genTimer);
   clearSave();
   st = {
+    jobId: new Date().toISOString().slice(0,10) + '_' + Math.random().toString(36).slice(2,6),
     propId: MASTER[0].id, workIdx: 0, person: STAFF[0], staffNum: 2,
     checkedAreas: [], activeArea: 0, activePhase: 0,
     photos: {}, comments: {}, startTime: null, endTime: null
