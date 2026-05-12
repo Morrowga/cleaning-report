@@ -489,16 +489,65 @@ textarea.txt-area:focus{border-color:#185FA5}
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxf56JDL6A4jpQxyM3SrRE9QmIIbR6oEfc-llg4TZWqhSpdKQh9D6oN_4YrpxG8EKB1/exec';
 
 // ========== GAS呼び出しヘルパー ==========
-async function callGAS(action, data = {}) {
-  const payload = new URLSearchParams();
-  payload.append('payload', JSON.stringify({ action, ...data }));
-  const res = await fetch(GAS_URL, {
-    method: 'POST',
-    body: payload
+function callGAS(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const iframeId = '_gas_iframe_' + Date.now();
+    const formId   = '_gas_form_'   + Date.now();
+    const cbName   = '_gas_cb_'     + Date.now();
+
+    // hidden iframe（フォーム送信先）
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeId;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    // タイムアウト
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('timeout'));
+    }, 30000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      if (document.body.contains(form))   document.body.removeChild(form);
+    }
+
+    // iframeのonloadでレスポンスを取得できないのでポーリング
+    // GASはリダイレクト後にiframeにHTMLを返すが読めないため
+    // 代わりにGASにcallback付きGETで結果を取得する方式に変更
+
+    // まずPOSTでデータ送信（結果は不要）
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GAS_URL;
+    form.target = iframeId;
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type  = 'hidden';
+    input.name  = 'payload';
+    input.value = JSON.stringify({ action, ...data });
+    form.appendChild(input);
+
+    // jobIdをGETで返答確認するためのcallback名
+    const cbInput = document.createElement('input');
+    cbInput.type  = 'hidden';
+    cbInput.name  = 'callback';
+    cbInput.value = cbName;
+    form.appendChild(cbInput);
+
+    // callback関数をwindowに登録
+    window[cbName] = function(result) {
+      cleanup();
+      if (result && result.ok) resolve(result);
+      else reject(new Error(result ? result.error : 'unknown error'));
+    };
+
+    document.body.appendChild(form);
+    form.submit();
   });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'GAS error');
-  return json;
 }
 
 // ========== マスタデータ（hardcoded） ==========
