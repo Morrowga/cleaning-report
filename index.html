@@ -9,9 +9,8 @@
 <title>清掃作業報告</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{width:100%;min-width:100%}
 html,body{height:100%;overflow:hidden}
-body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;background:#f5f5f0;color:#1a1a18;font-size:17px;line-height:1.6;width:100%;min-width:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;background:#f5f5f0;color:#1a1a18;font-size:17px;line-height:1.6}
 
 /* ---- App shell ---- */
 #app{height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:env(safe-area-inset-top,0px)}
@@ -486,87 +485,43 @@ textarea.txt-area:focus{border-color:#185FA5}
 
 <script>
 // ========== GAS エンドポイント ==========
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx5WYqK1UoKiInaNPb-FcPAuqBpWDKis9wcG_Jc8Mh3lUr4FJigzVj6QmFgUquNY_Vl/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxf56JDL6A4jpQxyM3SrRE9QmIIbR6oEfc-llg4TZWqhSpdKQh9D6oN_4YrpxG8EKB1/exec';
 
-// ========== GAS呼び出しヘルパー ==========
-function callGAS(action, data = {}) {
-  return new Promise((resolve, reject) => {
-    const iframeId = '_gas_iframe_' + Date.now();
-    const formId   = '_gas_form_'   + Date.now();
-    const cbName   = '_gas_cb_'     + Date.now();
-
-    // hidden iframe（フォーム送信先）
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeId;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    // タイムアウト
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('timeout'));
-    }, 30000);
-
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      if (document.body.contains(form))   document.body.removeChild(form);
-    }
-
-    // iframeのonloadでレスポンスを取得できないのでポーリング
-    // GASはリダイレクト後にiframeにHTMLを返すが読めないため
-    // 代わりにGASにcallback付きGETで結果を取得する方式に変更
-
-    // まずPOSTでデータ送信（結果は不要）
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = GAS_URL;
-    form.target = iframeId;
-    form.style.display = 'none';
-
-    const input = document.createElement('input');
-    input.type  = 'hidden';
-    input.name  = 'payload';
-    input.value = JSON.stringify({ action, ...data });
-    form.appendChild(input);
-
-    // jobIdをGETで返答確認するためのcallback名
-    const cbInput = document.createElement('input');
-    cbInput.type  = 'hidden';
-    cbInput.name  = 'callback';
-    cbInput.value = cbName;
-    form.appendChild(cbInput);
-
-    // callback関数をwindowに登録
-    window[cbName] = function(result) {
-      cleanup();
-      if (result && result.ok) resolve(result);
-      else reject(new Error(result ? result.error : 'unknown error'));
-    };
-
-    document.body.appendChild(form);
-    form.submit();
+async function callGAS(action, data = {}) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action, ...data })
   });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'GAS error');
+  return json;
 }
 
-// ========== マスタデータ（hardcoded） ==========
+// ========== マスタデータ ==========
 const MASTER = [
-  {id:'P001',name:'HI五反田ビル',addr:'東京都品川区西五反田2-11-17',works:['ガラス清掃'],areas:{'ガラス清掃':['外面ガラス(ロープ)','内面ガラス','エントランス']},comments:{'ガラス清掃':'シャンプースクイジー'}},
-  {id:'P002',name:'サンハイム田町',addr:'東京都港区芝5-13-5',works:['定期清掃'],areas:{'定期清掃':['共用廊下','1Fエントランス','共用階段']},comments:{'定期清掃':'洗剤散布\nポリッシャー洗浄\n汚水回収\n水拭き'}},
-  {id:'P003',name:'東京プリンスホテル',addr:'東京都港区芝公園3-3-1',works:['絨毯クリーニング'],areas:{'絨毯クリーニング':['客室ベッド下','客室ベッド下隅除塵','廊下','EVホール','廊下隅除塵後フィルター']},comments:{'絨毯クリーニング':'アップライト吸塵\n隅除塵\n洗剤散布\nポリッシャー洗浄'}}
+  {id:'P001',name:'HI五反田ビル',addr:'東京都品川区西五反田2-11-17',works:['ガラス清掃'],areas:{'ガラス清掃':['外面ガラス(ロープ)','内面ガラス','エントランス']},comments:{'ガラス清掃':'・シャンプースクイジー'}},
+  {id:'P002',name:'サンハイム田町',addr:'東京都港区芝5-13-5',works:['定期清掃'],areas:{'定期清掃':['共用廊下','1Fエントランス','共用階段']},comments:{'定期清掃':'・洗剤散布\n・ポリッシャー洗浄\n・汚水回収\n・水拭き'}},
+  {id:'P003',name:'東京プリンスホテル',addr:'東京都港区芝公園3-3-1',works:['絨毯クリーニング'],areas:{'絨毯クリーニング':['客室ベッド下','客室ベッド下隅除塵','廊下','EVホール','廊下隅除塵後フィルター']},comments:{'絨毯クリーニング':'・アップライト吸塵\n・隅除塵\n・洗剤散布\n・ポリッシャー洗浄'}},
+  {id:'P004',name:'グランドパレス渋谷',addr:'東京都渋谷区道玄坂1-12-1',works:['定期清掃','ガラス清掃'],areas:{'定期清掃':['エントランス','共用廊下','EV内'],'ガラス清掃':['外面ガラス','内面ガラス']},comments:{'定期清掃':'・洗剤散布\n・モップ拭き','ガラス清掃':'・シャンプースクイジー'}},
+  {id:'P005',name:'青山コートビル',addr:'東京都港区南青山3-8-40',works:['定期清掃'],areas:{'定期清掃':['1Fロビー','共用トイレ','非常階段']},comments:{'定期清掃':'・洗剤散布\n・ポリッシャー洗浄'}},
+  {id:'P006',name:'新橋SYビル',addr:'東京都港区新橋2-20-15',works:['ガラス清掃','定期清掃'],areas:{'ガラス清掃':['外面ガラス','内面ガラス','共用窓'],'定期清掃':['廊下','エントランス']},comments:{'ガラス清掃':'・シャンプースクイジー','定期清掃':'・洗剤散布\n・水拭き'}},
+  {id:'P007',name:'品川イーストタワー',addr:'東京都港区港南2-16-1',works:['定期清掃','絨毯クリーニング'],areas:{'定期清掃':['1Fエントランス','共用廊下','EV内','非常階段'],'絨毯クリーニング':['会議室A','会議室B','役員室']},comments:{'定期清掃':'・洗剤散布\n・モップ拭き','絨毯クリーニング':'・アップライト吸塵\n・洗剤散布'}},
+  {id:'P008',name:'代官山レジデンス',addr:'東京都渋谷区猿楽町29-9',works:['定期清掃'],areas:{'定期清掃':['共用廊下','駐車場','ゴミ置き場','エントランス']},comments:{'定期清掃':'・洗剤散布\n・ポリッシャー洗浄\n・水拭き'}},
+  {id:'P009',name:'六本木センタービル',addr:'東京都港区六本木3-2-1',works:['ガラス清掃','定期清掃'],areas:{'ガラス清掃':['外面ガラス(高層)','内面ガラス','エントランス扉'],'定期清掃':['共用廊下','EV内','屋上']},comments:{'ガラス清掃':'・ロープ作業\n・シャンプースクイジー','定期清掃':'・洗剤散布\n・水拭き'}},
+  {id:'P010',name:'麻布十番パークハウス',addr:'東京都港区麻布十番1-5-22',works:['定期清掃'],areas:{'定期清掃':['共用廊下','1Fエントランス','共用階段','駐輪場']},comments:{'定期清掃':'・洗剤散布\n・ポリッシャー洗浄'}}
 ];
-const STAFF  = ['兼古　泰士','山田　花子','鈴木　次郎','田中　一郎','佐藤　美咲'];
-const PHASES   = ['作業前','作業中','作業後'];
-const PC       = ['b','d','a'];
+const STAFF = ['兼古　泰士','山田　花子','鈴木　次郎','田中　一郎','佐藤　美咲'];
+const PHASES = ['作業前','作業中','作業後'];
+const PC = ['b','d','a'];
 const SAVE_KEY = 'cleaning_report_save';
 
 // ========== 状態 ==========
 let st = {
   jobId: new Date().toISOString().slice(0,10) + '_' + Math.random().toString(36).slice(2,6),
-  propId: null,
+  propId: MASTER[0].id,
   workIdx: 0,
-  person: '',
+  person: STAFF[0],
   staffNum: 2,
   checkedAreas: [],
   activeArea: 0,
@@ -618,9 +573,6 @@ function clearSave() { localStorage.removeItem(SAVE_KEY); }
 
 // ========== 初期化 ==========
 function init() {
-  st.propId = MASTER[0].id;
-  st.person = STAFF[0];
-
   document.getElementById('prop-count').textContent = `（${MASTER.length}件）`;
   buildDD();
   buildStaffPicker();
@@ -628,6 +580,7 @@ function init() {
   updateWorkPills();
   updateStaffDisplay();
 
+  // 保存データ確認
   const saved = loadLocal();
   const banner = document.getElementById('resume-banner');
   if (saved && saved.photos && Object.keys(saved.photos).length > 0) {
@@ -1021,14 +974,14 @@ async function startGenerate() {
   let uploaded = 0;
 
   // helper: retry up to maxTries times with delay
-  async function runWithRetry(action, data, maxTries = 3) {
+  async function runWithRetry(fnName, data, maxTries = 3) {
     let lastErr;
     for (let attempt = 1; attempt <= maxTries; attempt++) {
       try {
-        return await callGAS(action, data);
+        return await callGAS(fnName, data);
       } catch (err) {
         lastErr = err;
-        console.log(`${action} attempt ${attempt} failed:`, err);
+        console.log(`${fnName} attempt ${attempt} failed:`, err);
         if (attempt < maxTries) {
           document.getElementById('loading-sub').innerHTML =
             `通信エラー。再試行中... (${attempt}/${maxTries})<br>しばらくお待ちください`;
@@ -1039,13 +992,13 @@ async function startGenerate() {
     throw lastErr;
   }
 
-  // upload photos one by one with auto-retry
+  // upload photos one by one
   for (const key of photoKeys) {
     const base64 = st.photos[key].replace(/^data:image\/\w+;base64,/, '');
     const [area, phase] = key.split('-');
 
     try {
-      await runWithRetry('savePhoto', {
+      await runGAS('savePhoto', {
         jobId: st.jobId,
         area,
         phase,
@@ -1056,21 +1009,23 @@ async function startGenerate() {
       const pct = Math.round(uploaded / total * 80);
       document.getElementById('gen-prog').style.width = pct + '%';
       document.getElementById('loading-sub').innerHTML =
-        `${uploaded} / ${total}枚完了<br>通信が切れた場合も自動で再試行します`;
+        `${uploaded} / ${total}枚完了<br>通信が切れた場合も自動で再開します`;
 
     } catch (err) {
-      console.log('savePhoto failed after retries, key:', key, err);
+      console.log('savePhoto error on key:', key);
+      console.log('error:', err);
+      console.log('error message:', err.message);
       goScreen('3c');
       return;
     }
   }
 
-  // generate report with auto-retry
+  // generate report
   document.getElementById('loading-msg').textContent = 'レポートを生成中...';
   document.getElementById('gen-prog').style.width = '95%';
 
   try {
-    const result = await runWithRetry('generateReport', {
+    const result = await runGAS('generateReport', {
       jobId: st.jobId,
       property: prop(),
       worker: st.person,
@@ -1086,7 +1041,9 @@ async function startGenerate() {
     setTimeout(() => finishGenerate(result.reportUrl), 600);
 
   } catch (err) {
-    console.log('generateReport failed after retries:', err);
+    console.log('generateReport error:', err);
+    console.log('error message:', err.message);
+    console.log('error details:', JSON.stringify(err));
     goScreen('3c');
   }
 }
@@ -1125,7 +1082,6 @@ function resetApp() {
   clearInterval(genTimer);
   clearSave();
   st = {
-    jobId: new Date().toISOString().slice(0,10) + '_' + Math.random().toString(36).slice(2,6),
     propId: MASTER[0].id, workIdx: 0, person: STAFF[0], staffNum: 2,
     checkedAreas: [], activeArea: 0, activePhase: 0,
     photos: {}, comments: {}, startTime: null, endTime: null
